@@ -8,15 +8,15 @@
 #include "aq.h"
 #include <stdlib.h>
 
-typedef struct Msg {
+typedef struct MsgNode {
     void * data;       // Pointer to the message data
     MsgKind kind;     // Type of the message (alarm or normal)
-    struct Msg *next; // Pointer to the next message in the queue
-} Msg;
+    struct MsgNode *next; // Pointer to the next message in the queue
+} MsgNode;
 
 typedef struct {
-    Msg *head;
-    Msg *tail;
+    MsgNode *head;
+    MsgNode *tail;
     int size;
     int alarm_count;
 } AlarmQueueStruct;
@@ -46,7 +46,7 @@ int aq_send(AlarmQueue aq, void *msg, MsgKind k) {
     if (!queue || !msg) return AQ_NO_ROOM;
 
     // Create a new message node
-    Msg *new_msg = (Msg *)malloc(sizeof(Msg));
+    MsgNode *new_msg = (MsgNode *)malloc(sizeof(MsgNode));
     if (!new_msg) return AQ_NO_ROOM; // Memory allocation failed
 
     // Initialize the new message
@@ -100,7 +100,7 @@ int aq_recv(AlarmQueue aq, void **msg) {
     if (queue->head == NULL) return AQ_NO_MSG;
 
     // Retrieve the message at the head of the queue
-    Msg *received_msg = queue->head;
+    MsgNode *received_msg = queue->head;
     *msg = received_msg->data; // Assign the output message data
 
     // Update the head of the queue
