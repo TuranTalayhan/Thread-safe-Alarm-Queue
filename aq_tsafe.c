@@ -21,6 +21,8 @@ typedef struct {
     int size;
     int alarm_count;
     pthread_mutex_t mutex;
+    pthread_cond_t aq_alarm_full;
+    pthread_cond_t aq_not_empty;
 } AlarmQueueStruct;
 
 
@@ -34,6 +36,8 @@ AlarmQueue aq_create( ) {
         aq->size = 0;
         aq->alarm_count = 0;
         pthread_mutex_init(&aq->mutex, NULL);
+        pthread_cond_init(&aq->aq_alarm_full, NULL);
+        pthread_cond_init(&aq->aq_not_empty, NULL);
     }
 
     return aq;
@@ -50,104 +54,92 @@ int aq_send(AlarmQueue aq, void *msg, MsgKind k) {
     MsgNode *new_msg = (MsgNode *)malloc(sizeof(MsgNode));
     if (!new_msg) return AQ_NO_ROOM;
 
-    // Initialize the new message
     new_msg->data = msg;
     new_msg->kind = k;
     new_msg->next = NULL;
 
-    // Handle alarm messages
-    if (k == AQ_ALARM) {
-        // Check if there is already an alarm message
-        if (queue->alarm_count > 0) {
-            free(new_msg); // Clean up the allocated memory
-            return AQ_NO_ROOM;
-        }
+    pthread_mutex_lock(&queue->mutex);
 
-        // Insert the alarm message at the head of the queue
+    while (k==AQ_ALARM && queue->alarm_count > 0) {
+        pthread_cond_wait(&queue->aq_alarm_full, &queue->mutex);
+    }
+
+    if (k == AQ_ALARM) {
         new_msg->next = queue->head;
         queue->head = new_msg;
 
-        // If the queue was empty, also set the tail to this message
         if (queue->tail == NULL) {
             queue->tail = new_msg;
         }
-
-        // Update alarm count
         queue->alarm_count = 1;
+
     } else {
-        // Handle normal messages - append to the tail of the queue
         if (queue->tail) {
             queue->tail->next = new_msg;
         } else {
-            // If the queue was empty, set the head to the new message
             queue->head = new_msg;
         }
         queue->tail = new_msg;
     }
 
-    // Increment the size of the queue
     queue->size++;
-    return 0; // Success
+    pthread_cond_signal(&queue->aq_not_empty);
+    pthread_mutex_unlock(&queue->mutex);
+    return 0;
 }
 
 int aq_recv(AlarmQueue aq, void **msg) {
-    // Cast the void * to the appropriate struct type
     AlarmQueueStruct *queue = (AlarmQueueStruct *)aq;
-
-    // Check for null queue or message pointer
     if (!queue || !msg) return AQ_NO_MSG;
 
-    // Check if the queue is empty
-    if (queue->head == NULL) return AQ_NO_MSG;
+    pthread_mutex_lock(&queue->mutex);
 
-    // Retrieve the message at the head of the queue
+    if (queue->head == NULL) {
+        pthread_cond_wait(&queue->aq_not_empty, &queue->mutex);
+    }
+
     MsgNode *received_msg = queue->head;
-    *msg = received_msg->data; // Assign the output message data
+    *msg = received_msg->data;
 
-    // Update the head of the queue
     queue->head = received_msg->next;
 
-    // If the queue is now empty, also reset the tail pointer
     if (queue->head == NULL) {
         queue->tail = NULL;
     }
 
-    // Update the alarm count if the message was an alarm
     if (received_msg->kind == AQ_ALARM) {
         queue->alarm_count = 0;
+        pthread_cond_signal(&queue->aq_alarm_full);
     }
 
-    // Decrement the size of the queue
     queue->size--;
 
-    // Store the message type to return later
     int kind = received_msg->kind;
-
-    // Free the memory for the retrieved message
     free(received_msg);
 
-    // Return the kind of the message
+    pthread_mutex_unlock(&queue->mutex);
+
     return kind;
 }
 
 int aq_size(AlarmQueue aq) {
-    // Cast the void * to the appropriate struct type
     AlarmQueueStruct *queue = (AlarmQueueStruct *)aq;
-
-    // Check for null queue
     if (!queue) return 0;
 
-    // Return the current size of the queue
-    return queue->size;
+    pthread_mutex_lock(&queue->mutex);
+    int size = queue->size;
+    pthread_mutex_unlock(&queue->mutex);
+
+    return size;
 }
 
 int aq_alarms(AlarmQueue aq) {
-    // Cast the void * to the appropriate struct type
     AlarmQueueStruct *queue = (AlarmQueueStruct *)aq;
-
-    // Check for null queue
     if (!queue) return 0;
 
-    // Return the number of alarm messages (0 or 1)
-    return queue->alarm_count;
+    pthread_mutex_lock(&queue->mutex);
+    int alarm_count = queue->alarm_count;
+    pthread_mutex_unlock(&queue->mutex);
+
+    return alarm_count;
 }
