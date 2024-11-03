@@ -1,16 +1,9 @@
-/**
- * @file   aq.c
- * @Author 02335 team
- * @date   October, 2024
- * @brief  Alarm queue skeleton implementation
- */
-
 #include "aq.h"
 #include <stdlib.h>
 #include <pthread.h>
 
 typedef struct MsgNode {
-    void * data;
+    void *data;
     MsgKind kind;
     struct MsgNode *next;
 } MsgNode;
@@ -25,11 +18,8 @@ typedef struct {
     pthread_cond_t aq_not_empty;
 } AlarmQueueStruct;
 
-
-
-AlarmQueue aq_create( ) {
+AlarmQueue aq_create() {
     AlarmQueueStruct *aq = (AlarmQueueStruct *)malloc(sizeof(AlarmQueueStruct));
-
     if (aq != NULL) {
         aq->head = NULL;
         aq->tail = NULL;
@@ -39,16 +29,11 @@ AlarmQueue aq_create( ) {
         pthread_cond_init(&aq->aq_alarm_full, NULL);
         pthread_cond_init(&aq->aq_not_empty, NULL);
     }
-
     return aq;
-
-    return NULL;
 }
 
 int aq_send(AlarmQueue aq, void *msg, MsgKind k) {
-
     AlarmQueueStruct *queue = (AlarmQueueStruct *)aq;
-
     if (!queue || !msg) return AQ_NO_ROOM;
 
     MsgNode *new_msg = (MsgNode *)malloc(sizeof(MsgNode));
@@ -60,19 +45,17 @@ int aq_send(AlarmQueue aq, void *msg, MsgKind k) {
 
     pthread_mutex_lock(&queue->mutex);
 
-    while (k==AQ_ALARM && queue->alarm_count > 0) {
+    while (k == AQ_ALARM && queue->alarm_count > 0) {
         pthread_cond_wait(&queue->aq_alarm_full, &queue->mutex);
     }
 
     if (k == AQ_ALARM) {
         new_msg->next = queue->head;
         queue->head = new_msg;
-
         if (queue->tail == NULL) {
             queue->tail = new_msg;
         }
         queue->alarm_count = 1;
-
     } else {
         if (queue->tail) {
             queue->tail->next = new_msg;
@@ -94,15 +77,13 @@ int aq_recv(AlarmQueue aq, void **msg) {
 
     pthread_mutex_lock(&queue->mutex);
 
-    if (queue->head == NULL) {
+    while (queue->head == NULL) {
         pthread_cond_wait(&queue->aq_not_empty, &queue->mutex);
     }
 
     MsgNode *received_msg = queue->head;
     *msg = received_msg->data;
-
     queue->head = received_msg->next;
-
     if (queue->head == NULL) {
         queue->tail = NULL;
     }
@@ -113,7 +94,6 @@ int aq_recv(AlarmQueue aq, void **msg) {
     }
 
     queue->size--;
-
     int kind = received_msg->kind;
     free(received_msg);
 
