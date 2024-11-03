@@ -32,7 +32,6 @@ void *receive_messages(void *arg) {
     }
     return NULL;
 }
-
 int main() {
     AlarmQueue q = aq_create();
     if (q == NULL) {
@@ -49,11 +48,13 @@ int main() {
     pthread_create(&t1, NULL, send_normal, &args1);
     pthread_create(&t2, NULL, send_normal, &args2);
     pthread_create(&t3, NULL, send_normal, &args3);
-    pthread_create(&t4, NULL, receive_messages, q);
 
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
     pthread_join(t3, NULL);
+
+    pthread_create(&t4, NULL, receive_messages, q);
+
     pthread_join(t4, NULL);
 
     return 0;
