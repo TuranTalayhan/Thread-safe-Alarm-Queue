@@ -43,9 +43,9 @@ int main() {
     AlarmQueue *q = aq_create();
     pthread_t t1, t2, t3, t4;
 
-    pthread_create(&t1, NULL, send_normal, q);
+    pthread_create(&t1, NULL, send_alarm, q);
     pthread_create(&t2, NULL, send_alarm, q);
-    pthread_create(&t3, NULL, send_alarm, q);
+    pthread_create(&t3, NULL, send_normal, q);
     pthread_create(&t4, NULL, receive_message, q);
 
     pthread_join(t1, NULL);
