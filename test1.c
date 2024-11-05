@@ -24,8 +24,8 @@ void *send_normal(void *arg) {
 void *receive_message(void *arg) {
     AlarmQueue *q = (AlarmQueue *)arg;
     void *msg;
-    for (int i = 0; i < 3; i++) { // Adjust the loop count as needed
-        sleep(3); // Ensure this runs after the first send
+    for (int i = 0; i < 3; i++) {
+        sleep(3);
         printf("Receiving message...\n");
         int kind = aq_recv(q, &msg);
         if (kind == AQ_ALARM) {
